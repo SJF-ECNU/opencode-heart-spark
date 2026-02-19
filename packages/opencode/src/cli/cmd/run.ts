@@ -291,6 +291,11 @@ export const RunCommand = cmd({
         describe: "show thinking blocks",
         default: false,
       })
+      .option("companion", {
+        alias: ["companion"],
+        describe: "enter companion mode for virtual partner chat",
+        type: "boolean",
+      })
   },
   handler: async (args) => {
     let message = [...args.message, ...(args["--"] || [])]
