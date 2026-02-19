@@ -112,10 +112,11 @@ import { resolve } from "path";
 const PERSONA_PATH = resolve(import.meta.dir, "../../../../persona");
 
 describe("loadPersona", () => {
-  it("should load default persona", async () => {
+  it("should load default persona with dynamic file index", async () => {
     const persona = await loadPersona(PERSONA_PATH, "default");
-    expect(persona.systemPrompt).toContain("integration_prompt");
-    expect(persona.files).toBeGreaterThan(0);
+    expect(persona?.systemPrompt).toContain("可用角色文件");
+    expect(persona?.files).toBeGreaterThan(0);
+    expect(persona?.fileIndex).toContain("可用角色文件");
   });
 
   it("should return null for non-existent persona", async () => {
@@ -153,45 +154,42 @@ export interface PersonaInfo {
 export interface Persona {
   systemPrompt: string;
   files: number;
+  fileIndex: string; // 动态生成的文件索引
 }
 
-const LOAD_ORDER = [
-  "system/integration_prompt.md",
-  "system/consistency_rules.md",
-  "01_identity/basic_profile.md",
-  "01_identity/appearance.md",
-  "01_identity/temperament_tags.md",
-  "01_identity/public_image.md",
-  "02_psychological_core/attachment_style.md",
-  "02_psychological_core/core_beliefs.md",
-  "02_psychological_core/values.md",
-  "02_psychological_core/fears.md",
-  "02_psychological_core/insecurities.md",
-  "02_psychological_core/self_concept.md",
-  "03_cognitive_model/decision_logic.md",
-  "03_cognitive_model/moral_framework.md",
-  "03_cognitive_model/conflict_evaluation.md",
-  "03_cognitive_model/jealousy_logic.md",
-  "04_emotional_system/baseline_emotion.md",
-  "04_emotional_system/positive_triggers.md",
-  "04_emotional_system/negative_triggers.md",
-  "04_emotional_system/shame_triggers.md",
-  "04_emotional_system/anger_pattern.md",
-  "04_emotional_system/affection_expression.md",
-  "05_behavior_system/speech_style/tone.md",
-  "05_behavior_system/speech_style/texting_pattern.md",
-  "05_behavior_system/speech_style/humor_style.md",
-  "05_behavior_system/speech_style/flirting_style.md",
-  "05_behavior_system/conflict_behavior.md",
-  "05_behavior_system/intimacy_behavior.md",
-  "05_behavior_system/withdrawal_behavior.md",
-  "06_relationship_framework/ideal_partner.md",
-  "06_relationship_framework/boundaries.md",
-  "06_relationship_framework/attachment_dynamics.md",
-  "06_relationship_framework/commitment_logic.md",
-  "06_relationship_framework/breakup_conditions.md",
-  "06_relationship_framework/reconciliation_logic.md",
-];
+// 动态扫描角色目录，生成文件索引
+async function generateFileIndex(personaPath: string): Promise<string> {
+  const entries = await readdir(personaPath, { withFileTypes: true, recursive: true });
+
+  // 按文件夹分组
+  const grouped: Record<string, string[]> = {};
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
+    const dir = entry.name.includes("/") ? entry.name.split("/")[0] : "root";
+    if (!grouped[dir]) grouped[dir] = [];
+    grouped[dir].push(entry.name);
+  }
+
+  // 生成索引
+  let index = `## 可用角色文件\n\n`;
+  index += `共 ${Object.values(grouped).flat().length} 个文件：\n\n`;
+
+  for (const [dir, fileList] of Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b))) {
+    index += `### ${dir}/\n`;
+    for (const file of fileList.sort()) {
+      const name = file.replace(dir + "/", "").replace(".md", "");
+      index += `- ${file} - ${formatFileName(name)}\n`;
+    }
+    index += "\n";
+  }
+
+  index += `\n使用 ReadTool 读取这些文件来了解角色详情。`;
+  return index;
+}
+
+function formatFileName(name: string): string {
+  return name.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+}
 
 export async function listPersonas(basePath: string): Promise<PersonaInfo[]> {
   const entries = await readdir(basePath, { withFileTypes: true });
@@ -209,14 +207,25 @@ export async function listPersonas(basePath: string): Promise<PersonaInfo[]> {
   return personas.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+// 优先加载顺序（固定的核心文件）
+const PRIORITY_FILES = [
+  "system/integration_prompt.md",
+  "system/consistency_rules.md",
+];
+
 export async function loadPersona(basePath: string, name: string): Promise<Persona | null> {
   const personaPath = resolve(basePath, name);
 
   try {
-    const parts: string[] = [];
+    // 1. 动态生成文件索引（放在最前面）
+    const fileIndex = await generateFileIndex(personaPath);
+
+    // 2. 按优先级加载核心文件
+    const parts: string[] = [fileIndex, "\n\n---\n\n"]; // 索引在前
     let fileCount = 0;
 
-    for (const file of LOAD_ORDER) {
+    // 优先加载核心文件
+    for (const file of PRIORITY_FILES) {
       const filePath = join(personaPath, file);
       try {
         const content = await readFile(filePath, "utf-8");
@@ -227,13 +236,40 @@ export async function loadPersona(basePath: string, name: string): Promise<Perso
       }
     }
 
-    if (parts.length === 0) {
+    // 3. 动态加载其余md文件
+    const allEntries = await readdir(personaPath, { withFileTypes: true, recursive: true });
+    const loadedFiles = new Set(PRIORITY_FILES);
+
+    for (const entry of allEntries) {
+      if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
+      if (loadedFiles.has(entry.name)) continue;
+
+      const filePath = join(personaPath, entry.name);
+      try {
+        const content = await readFile(filePath, "utf-8");
+        parts.push(content);
+        fileCount++;
+      } catch {
+        // Skip
+      }
+    }
+
+    if (fileCount === 0) {
       return null;
     }
 
     return {
       systemPrompt: parts.join("\n\n"),
       files: fileCount,
+      fileIndex,
+    };
+  } catch {
+    return null;
+  }
+}
+      systemPrompt: parts.join("\n\n"),
+      files: fileCount,
+      fileIndex,
     };
   } catch {
     return null;
