@@ -298,6 +298,33 @@ export const RunCommand = cmd({
       })
   },
   handler: async (args) => {
+    // Companion mode
+    if (args.companion) {
+      const { resolve } = await import("path");
+      const { loadPersona } = await import("../../persona/loader");
+      const { selectPersona } = await import("../../persona/cli");
+
+      const personaPath = resolve(process.cwd(), "persona");
+
+      const selectedPersona = await selectPersona();
+      if (!selectedPersona) {
+        UI.error("No persona selected, exiting");
+        process.exit(1);
+      }
+
+      const persona = await loadPersona(personaPath, selectedPersona);
+      if (!persona) {
+        UI.error(`Failed to load persona: ${selectedPersona}`);
+        process.exit(1);
+      }
+
+      UI.println(UI.Style.TEXT_SUCCESS + `Loaded companion: ${selectedPersona}` + UI.Style.TEXT_NORMAL);
+
+      // Store companion mode flag and persona prompt for later use
+      (globalThis as any).__COMPANION_MODE__ = true;
+      (globalThis as any).__PERSONA_SYSTEM_PROMPT__ = persona.systemPrompt;
+    }
+
     let message = [...args.message, ...(args["--"] || [])]
       .map((arg) => (arg.includes(" ") ? `"${arg.replace(/"/g, '\\"')}"` : arg))
       .join(" ")
