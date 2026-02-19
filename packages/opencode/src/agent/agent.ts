@@ -200,6 +200,21 @@ export namespace Agent {
         ),
         prompt: PROMPT_SUMMARY,
       },
+      heartspark: {
+        name: "heartspark",
+        description: "Heartspark mode - AI companion with emotional intelligence and persona-specific interactions.",
+        options: {},
+        permission: PermissionNext.merge(
+          defaults,
+          PermissionNext.fromConfig({
+            question: "allow",
+            plan_enter: "allow",
+          }),
+          user,
+        ),
+        mode: "primary",
+        native: true,
+      },
     }
 
     for (const [key, value] of Object.entries(cfg.agent ?? {})) {
