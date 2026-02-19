@@ -28,4 +28,6 @@ opencode-dev
 logs/
 *.bun-build
 
-/docs
+docs/
+.claude/
+.specify/
