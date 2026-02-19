@@ -650,9 +650,9 @@ export namespace SessionPrompt {
       await Plugin.trigger("experimental.chat.messages.transform", {}, { messages: sessionMessages })
 
       // Build system prompt, adding structured output instruction if needed
-      // Also add persona prompt if in companion mode
-      const isCompanionMode = (globalThis as any).__COMPANION_MODE__ === true;
-      const personaPrompt = (globalThis as any).__PERSONA_SYSTEM_PROMPT__;
+      // Also add persona prompt if in companion mode (check both globalThis and env vars)
+      const isCompanionMode = (globalThis as any).__COMPANION_MODE__ === true || process.env.OPENCODE_COMPANION_MODE === "1";
+      const personaPrompt = (globalThis as any).__PERSONA_SYSTEM_PROMPT__ || process.env.OPENCODE_PERSONA_PROMPT || "";
 
       let system = [...(await SystemPrompt.environment(model)), ...(await InstructionPrompt.system())];
 

@@ -84,6 +84,8 @@ export const TuiThreadCommand = cmd({
       }),
   handler: async (args) => {
     // Companion mode: load persona and set global flags before starting TUI
+    let companionMode = false;
+    let personaSystemPrompt = "";
     if (args.companion) {
       const { resolve } = await import("path");
       const { loadPersona } = await import("../../../persona/loader");
@@ -105,9 +107,16 @@ export const TuiThreadCommand = cmd({
 
       UI.println(UI.Style.TEXT_SUCCESS + `Loaded companion: ${selectedPersona}` + UI.Style.TEXT_NORMAL);
 
+      companionMode = true;
+      personaSystemPrompt = persona.systemPrompt;
+
       // Store companion mode flag and persona prompt for later use
       (globalThis as any).__COMPANION_MODE__ = true;
       (globalThis as any).__PERSONA_SYSTEM_PROMPT__ = persona.systemPrompt;
+
+      // Also set env vars for worker
+      process.env.OPENCODE_COMPANION_MODE = "1";
+      process.env.OPENCODE_PERSONA_PROMPT = persona.systemPrompt;
     }
     // Keep ENABLE_PROCESSED_INPUT cleared even if other code flips it.
     // (Important when running under `bun run` wrappers on Windows.)
