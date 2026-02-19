@@ -320,7 +320,8 @@ export const RunCommand = cmd({
 
       UI.println(UI.Style.TEXT_SUCCESS + `Loaded companion: ${selectedPersona}` + UI.Style.TEXT_NORMAL);
 
-      // Store companion mode flag and persona prompt for later use
+      // Enable thinking for AI reasoning but hide from user (better immersion)
+      args.thinking = true;
       (globalThis as any).__COMPANION_MODE__ = true;
       (globalThis as any).__PERSONA_SYSTEM_PROMPT__ = persona.systemPrompt;
     }
@@ -528,6 +529,10 @@ export const RunCommand = cmd({
 
             if (part.type === "reasoning" && part.time?.end && args.thinking) {
               if (emit("reasoning", { part })) continue
+              // Hide thinking in companion mode for better immersion
+              if ((globalThis as any).__COMPANION_MODE__) {
+                continue
+              }
               const text = part.text.trim()
               if (!text) continue
               const line = `Thinking: ${text}`
