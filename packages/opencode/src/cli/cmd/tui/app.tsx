@@ -652,6 +652,47 @@ function App() {
         dialog.clear()
       },
     },
+    {
+      title: "Flush memory",
+      value: "memory.flush",
+      category: "Memory",
+      slash: {
+        name: "memory",
+        aliases: ["mem"],
+      },
+      onSelect: (dialog) => {
+        // Get the current input text to use as memory content
+        const currentInput = promptRef?.current?.current?.input?.trim() || ""
+        // Extract content after "/memory flush " if present
+        const content = currentInput.startsWith("/memory flush ")
+          ? currentInput.slice(15)
+          : currentInput
+
+        // Get session ID from route if in session
+        const sessionID = route.data.type === "session" ? route.data.sessionID : undefined
+
+        // Get directory from sync context
+        const directory = sync.data.path.directory || process.cwd()
+
+        // Execute flush command and show result
+        import("../../cmd/memory-commands.js").then(({ cmdFlushMemory }) => {
+          cmdFlushMemory({ content, sessionID, directory })
+            .then((result) => {
+              toast.show({
+                variant: "info",
+                message: result || "Memory flushed",
+              })
+            })
+            .catch((err) => {
+              toast.show({
+                variant: "error",
+                message: `Memory flush failed: ${err.message}`,
+              })
+            })
+        })
+        dialog.clear()
+      },
+    },
   ])
 
   createEffect(() => {

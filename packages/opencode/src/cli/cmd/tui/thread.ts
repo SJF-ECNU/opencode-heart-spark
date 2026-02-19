@@ -107,16 +107,27 @@ export const TuiThreadCommand = cmd({
 
       UI.println(UI.Style.TEXT_SUCCESS + `Loaded companion: ${selectedPersona}` + UI.Style.TEXT_NORMAL);
 
+      // Initialize memory system for the persona
+      const { initializePersonaMemory, getPersonaMemoryContext } = await import("../../../persona/memory-integration");
+      await initializePersonaMemory(selectedPersona);
+      const memoryContext = await getPersonaMemoryContext();
+
+      // Append memory context to persona prompt
+      const fullPersonaPrompt = persona.systemPrompt + memoryContext;
+
       companionMode = true;
-      personaSystemPrompt = persona.systemPrompt;
+      personaSystemPrompt = fullPersonaPrompt;
 
       // Store companion mode flag and persona prompt for later use
       (globalThis as any).__COMPANION_MODE__ = true;
-      (globalThis as any).__PERSONA_SYSTEM_PROMPT__ = persona.systemPrompt;
+      (globalThis as any).__PERSONA_SYSTEM_PROMPT__ = fullPersonaPrompt;
+      (globalThis as any).__PERSONA_MEMORY_CONTEXT__ = memoryContext;
+      (globalThis as any).__PERSONA_ID__ = selectedPersona;
 
       // Also set env vars for worker
       process.env.OPENCODE_COMPANION_MODE = "1";
-      process.env.OPENCODE_PERSONA_PROMPT = persona.systemPrompt;
+      process.env.OPENCODE_PERSONA_PROMPT = fullPersonaPrompt;
+      process.env.OPENCODE_PERSONA_ID = selectedPersona;
     }
     // Keep ENABLE_PROCESSED_INPUT cleared even if other code flips it.
     // (Important when running under `bun run` wrappers on Windows.)
