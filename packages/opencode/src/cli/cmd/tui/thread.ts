@@ -76,8 +76,39 @@ export const TuiThreadCommand = cmd({
       .option("agent", {
         type: "string",
         describe: "agent to use",
+      })
+      .option("companion", {
+        alias: ["companion"],
+        describe: "enter companion mode for virtual partner chat",
+        type: "boolean",
       }),
   handler: async (args) => {
+    // Companion mode: load persona and set global flags before starting TUI
+    if (args.companion) {
+      const { resolve } = await import("path");
+      const { loadPersona } = await import("../../../persona/loader");
+      const { selectPersona } = await import("../../../persona/cli");
+      const { UI } = await import("../../../cli/ui");
+
+      const personaPath = resolve(process.cwd(), "persona");
+      const selectedPersona = await selectPersona();
+      if (!selectedPersona) {
+        UI.error("No persona selected, exiting");
+        process.exit(1);
+      }
+
+      const persona = await loadPersona(personaPath, selectedPersona);
+      if (!persona) {
+        UI.error(`Failed to load persona: ${selectedPersona}`);
+        process.exit(1);
+      }
+
+      UI.println(UI.Style.TEXT_SUCCESS + `Loaded companion: ${selectedPersona}` + UI.Style.TEXT_NORMAL);
+
+      // Store companion mode flag and persona prompt for later use
+      (globalThis as any).__COMPANION_MODE__ = true;
+      (globalThis as any).__PERSONA_SYSTEM_PROMPT__ = persona.systemPrompt;
+    }
     // Keep ENABLE_PROCESSED_INPUT cleared even if other code flips it.
     // (Important when running under `bun run` wrappers on Windows.)
     const unguard = win32InstallCtrlCGuard()
